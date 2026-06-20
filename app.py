@@ -1,4 +1,7 @@
 import os
+# Resolve protobuf version compilation mismatch on Streamlit Community Cloud
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
 import streamlit as st
 from pathlib import Path
 from datetime import datetime

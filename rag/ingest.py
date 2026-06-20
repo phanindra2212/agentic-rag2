@@ -19,13 +19,31 @@ from utils.helpers import clean_text, get_file_extension
 from utils.metrics import update_document_stats, get_analytics
 
 def get_vector_store() -> Chroma:
-    """Initializes and returns the persistent Chroma vector store."""
+    """Initializes and returns the persistent Chroma vector store.
+    Uses model-specific collections to avoid dimension mismatch errors when switching models.
+    """
     embeddings = get_embeddings_model()
     # Ensure directory exists
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     
+    # Generate model-specific collection name
+    model_identifier = "default"
+    if hasattr(embeddings, "model_name"):
+        model_identifier = embeddings.model_name
+    elif hasattr(embeddings, "model"):
+        model_identifier = embeddings.model
+    elif hasattr(embeddings, "size"):
+        model_identifier = f"fake_{embeddings.size}"
+        
+    # Clean the identifier for Chroma collection naming rules (alphanumeric, _ or - only)
+    clean_id = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in model_identifier)
+    clean_id = clean_id.strip("_")[:40]
+    collection_name = f"{CHROMA_COLLECTION_NAME}_{clean_id}"
+    
+    logger.info(f"Using Chroma collection: {collection_name}")
+    
     return Chroma(
-        collection_name=CHROMA_COLLECTION_NAME,
+        collection_name=collection_name,
         embedding_function=embeddings,
         persist_directory=str(CHROMA_DIR)
     )

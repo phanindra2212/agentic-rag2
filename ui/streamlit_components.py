@@ -130,21 +130,7 @@ def generate_pdf_chat(chat_history: List[Dict[str, Any]]) -> bytes:
         fallback_txt = f"PDF compilation failed: {e}\n\n" + generate_txt_chat(chat_history)
         return fallback_txt.encode("utf-8")
 
-def render_sidebar_api_key() -> None:
-    """Renders API Key configuration section in sidebar."""
-    st.sidebar.markdown("### 🔑 API Authentication")
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    
-    # Text input for API Key
-    user_key = st.sidebar.text_input(
-        "Gemini API Key",
-        value=api_key,
-        type="password",
-        help="Input your Gemini API key. If already set as an environment variable, you can leave this blank."
-    )
-    
-    if user_key:
-        os.environ["GEMINI_API_KEY"] = user_key
+
 
 def render_sidebar_uploader() -> None:
     """Renders multi-file uploader component in sidebar."""
@@ -374,6 +360,12 @@ def render_analytics_dashboard() -> None:
         })
     df = pd.DataFrame(df_data)
     
+    # Detect active visual theme
+    theme = st.session_state.get("app_theme", "light")
+    plotly_template = "plotly_dark" if theme == "dark" else "plotly"
+    grid_color = "#334155" if theme == "dark" else "#E2E8F0"
+    text_color = "#F8FAFC" if theme == "dark" else "#0F172A"
+    
     # 1. Latency Plot
     st.markdown("### ⏱️ Latency Analysis")
     fig_latency = px.line(
@@ -382,9 +374,18 @@ def render_analytics_dashboard() -> None:
         y=["Retrieval Time (s)", "Response Time (s)"],
         title="Execution Latency Over Successive Queries",
         markers=True,
+        template=plotly_template,
         color_discrete_sequence=["#3B82F6", "#10B981"] # Blue and Green
     )
-    fig_latency.update_layout(xaxis_title="Query Sequence Number", yaxis_title="Time (Seconds)")
+    fig_latency.update_layout(
+        xaxis_title="Query Sequence Number", 
+        yaxis_title="Time (Seconds)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=text_color)
+    )
+    fig_latency.update_xaxes(showgrid=True, gridcolor=grid_color, color=text_color)
+    fig_latency.update_yaxes(showgrid=True, gridcolor=grid_color, color=text_color)
     st.plotly_chart(fig_latency, use_container_width=True)
     
     # 2. Evaluation Scores History
@@ -395,9 +396,18 @@ def render_analytics_dashboard() -> None:
         y=["Context Precision", "Context Recall", "Faithfulness", "Answer Relevance"],
         title="Quality Scores Trends (LLM-Grounded Evaluation)",
         markers=True,
+        template=plotly_template,
         color_discrete_sequence=["#EC4899", "#8B5CF6", "#F59E0B", "#14B8A6"] # Pink, Purple, Orange, Teal
     )
-    fig_eval.update_layout(xaxis_title="Query Sequence Number", yaxis_title="Score (0.0 to 1.0)")
+    fig_eval.update_layout(
+        xaxis_title="Query Sequence Number", 
+        yaxis_title="Score (0.0 to 1.0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=text_color)
+    )
+    fig_eval.update_xaxes(showgrid=True, gridcolor=grid_color, color=text_color)
+    fig_eval.update_yaxes(showgrid=True, gridcolor=grid_color, color=text_color)
     st.plotly_chart(fig_eval, use_container_width=True)
     
     # 3. Export/Reset Section

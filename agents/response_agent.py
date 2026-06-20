@@ -6,8 +6,10 @@ from rag.memory import format_chat_history_for_prompt
 from utils.logger import logger
 from utils.helpers import format_citations
 
+from config.settings import get_gemini_api_key
+
 def _get_response_llm() -> Any:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = get_gemini_api_key()
     if not api_key:
         return None
     try:

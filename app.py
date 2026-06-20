@@ -9,7 +9,6 @@ load_dotenv()
 
 from agents.workflow import execute_agentic_rag
 from ui.streamlit_components import (
-    render_sidebar_api_key,
     render_sidebar_uploader,
     render_sidebar_collection_stats,
     render_confidence_badge,
@@ -23,7 +22,7 @@ from ui.streamlit_components import (
 )
 from utils.logger import logger
 
-# --- Page Config & Styling ---
+# --- Page Config ---
 st.set_page_config(
     page_title="Agentic Multi-Doc RAG Assistant",
     page_icon="🤖",
@@ -31,77 +30,338 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Premium Styling (HSL tailoring, slate backgrounds, clean typography)
-st.markdown("""
-<style>
-    /* Primary Colors & Typography */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    /* Header Gradient */
-    .header-container {
-        background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
-        padding: 2.5rem 2rem;
-        border-radius: 16px;
-        color: white;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 20px -2px rgba(59, 130, 246, 0.3);
-    }
-    
-    .header-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: -0.025em;
-    }
-    
-    .header-subtitle {
-        font-size: 1.1rem;
-        opacity: 0.9;
-        margin-top: 0.5rem;
-        font-weight: 300;
-    }
-    
-    /* Chat Messages styling */
-    .user-msg {
-        background-color: #F1F5F9;
-        color: #0F172A;
-        border-left: 4px solid #3B82F6;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-    }
-    
-    .assistant-msg {
-        background-color: #FFFFFF;
-        color: #0F172A;
-        border-left: 4px solid #10B981;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-    }
-    
-    /* System Metrics Footer */
-    .system-metrics-footer {
-        border-top: 1px solid #E2E8F0;
-        padding: 1rem 0;
-        margin-top: 3rem;
-        font-size: 0.85rem;
-        color: #64748B;
-        text-align: center;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # Initialize Session State Variables
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "last_query_metrics" not in st.session_state:
     st.session_state.last_query_metrics = {}
+if "app_theme" not in st.session_state:
+    st.session_state.app_theme = "light"
+
+# --- Sidebar Theme Controller ---
+st.sidebar.markdown("### 🎨 Visual Theme")
+theme_toggle = st.sidebar.toggle(
+    "🌓 Enable Dark Theme",
+    value=(st.session_state.app_theme == "dark"),
+    help="Toggle between Light and Dark mode for the app."
+)
+new_theme = "dark" if theme_toggle else "light"
+if new_theme != st.session_state.app_theme:
+    st.session_state.app_theme = new_theme
+    st.rerun()
+
+# Apply Dynamic CSS based on theme
+if st.session_state.app_theme == "dark":
+    css_style = """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Main page layout */
+        html, body, [class*="css"], .stApp {
+            font-family: 'Inter', sans-serif;
+            background-color: #0F172A !important;
+            color: #F8FAFC !important;
+        }
+        
+        [data-testid="stHeader"] {
+            background-color: transparent !important;
+        }
+        
+        /* Sidebar layout */
+        [data-testid="stSidebar"], section[data-testid="stSidebar"], .stSidebar {
+            background-color: #1E293B !important;
+            border-right: 1px solid #334155 !important;
+        }
+        
+        /* Sidebar text */
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] li {
+            color: #CBD5E1 !important;
+        }
+        
+        /* Markdown / normal text styling */
+        div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] li, span, label, .stSubheader {
+            color: #F8FAFC !important;
+        }
+        
+        /* Headings */
+        h1, h2, h3, h4, h5, h6 {
+            color: #F8FAFC !important;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Chat Messages Dark Mode styling */
+        .user-msg {
+            background-color: #1E293B !important;
+            color: #F8FAFC !important;
+            border-left: 4px solid #3B82F6 !important;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #334155;
+        }
+        
+        .assistant-msg {
+            background-color: #0F172A !important;
+            color: #F8FAFC !important;
+            border-left: 4px solid #10B981 !important;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+        }
+        
+        /* Header Gradient Dark Theme */
+        .header-container {
+            background: linear-gradient(135deg, #1E1B4B 0%, #1E3A8A 100%) !important;
+            padding: 2.5rem 2rem;
+            border-radius: 16px;
+            color: white;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px -2px rgba(30, 58, 138, 0.4);
+            border: 1px solid #1E40AF;
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.025em;
+            color: white !important;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+            font-weight: 300;
+            color: white !important;
+        }
+        
+        /* Input elements, Selectboxes, Textareas */
+        .stTextInput input, .stTextArea textarea, .stSelectbox [role="combobox"], [data-baseweb="select"] > div {
+            background-color: #1E293B !important;
+            color: #F8FAFC !important;
+            border: 1px solid #334155 !important;
+        }
+        
+        div[role="listbox"], [data-baseweb="popover"] {
+            background-color: #1E293B !important;
+            color: #F8FAFC !important;
+            border: 1px solid #334155 !important;
+        }
+        
+        /* Multiselect selections */
+        .stMultiSelect div[role="button"] {
+            background-color: #334155 !important;
+            color: #F8FAFC !important;
+        }
+        
+        /* File Uploader styling */
+        [data-testid="stFileUploader"] {
+            background-color: #1E293B !important;
+            border: 1px dashed #334155 !important;
+            border-radius: 8px !important;
+            padding: 10px !important;
+        }
+        
+        /* Tabs styling */
+        .stTabs [data-baseweb="tab-list"] {
+            border-bottom: 1px solid #334155 !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            color: #94A3B8 !important;
+            background-color: transparent !important;
+        }
+        .stTabs [aria-selected="true"] {
+            color: #3B82F6 !important;
+            border-bottom-color: #3B82F6 !important;
+        }
+        
+        /* Buttons styling */
+        .stButton button, [role="button"], button[kind="secondary"] {
+            background-color: #1E293B !important;
+            color: #F8FAFC !important;
+            border: 1px solid #334155 !important;
+        }
+        .stButton button:hover, button[kind="secondary"]:hover {
+            border-color: #3B82F6 !important;
+            color: #3B82F6 !important;
+        }
+        
+        /* Expanders styling */
+        .st-emotion-cache-1h9z78m, .streamlit-expanderHeader {
+            background-color: #1E293B !important;
+            border: 1px solid #334155 !important;
+            border-radius: 4px;
+        }
+        
+        .system-metrics-footer {
+            border-top: 1px solid #1E293B;
+            padding: 1rem 0;
+            margin-top: 3rem;
+            font-size: 0.85rem;
+            color: #94A3B8;
+            text-align: center;
+        }
+    </style>
+    """
+else:
+    css_style = """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Main page layout */
+        html, body, [class*="css"], .stApp {
+            font-family: 'Inter', sans-serif;
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+        }
+        
+        [data-testid="stHeader"] {
+            background-color: transparent !important;
+        }
+        
+        /* Sidebar layout */
+        [data-testid="stSidebar"], section[data-testid="stSidebar"], .stSidebar {
+            background-color: #F1F5F9 !important;
+            border-right: 1px solid #E2E8F0 !important;
+        }
+        
+        /* Sidebar text */
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] li {
+            color: #334155 !important;
+        }
+        
+        /* Markdown / normal text styling */
+        div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] li, span, label, .stSubheader {
+            color: #0F172A !important;
+        }
+        
+        /* Headings */
+        h1, h2, h3, h4, h5, h6 {
+            color: #0F172A !important;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Chat Messages Light Mode styling */
+        .user-msg {
+            background-color: #F1F5F9 !important;
+            color: #0F172A !important;
+            border-left: 4px solid #3B82F6 !important;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #E2E8F0;
+        }
+        
+        .assistant-msg {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border-left: 4px solid #10B981 !important;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+        
+        /* Header Gradient Light Theme */
+        .header-container {
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important;
+            padding: 2.5rem 2rem;
+            border-radius: 16px;
+            color: white;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px -2px rgba(59, 130, 246, 0.3);
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.025em;
+            color: white !important;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+            font-weight: 300;
+            color: white !important;
+        }
+        
+        /* Input elements, Selectboxes, Textareas */
+        .stTextInput input, .stTextArea textarea, .stSelectbox [role="combobox"], [data-baseweb="select"] > div {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #E2E8F0 !important;
+        }
+        
+        div[role="listbox"], [data-baseweb="popover"] {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #E2E8F0 !important;
+        }
+        
+        /* Multiselect selections */
+        .stMultiSelect div[role="button"] {
+            background-color: #E2E8F0 !important;
+            color: #0F172A !important;
+        }
+        
+        /* File Uploader styling */
+        [data-testid="stFileUploader"] {
+            background-color: #F8FAFC !important;
+            border: 1px dashed #E2E8F0 !important;
+            border-radius: 8px !important;
+            padding: 10px !important;
+        }
+        
+        /* Tabs styling */
+        .stTabs [data-baseweb="tab-list"] {
+            border-bottom: 1px solid #E2E8F0 !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            color: #64748B !important;
+            background-color: transparent !important;
+        }
+        .stTabs [aria-selected="true"] {
+            color: #2563EB !important;
+            border-bottom-color: #2563EB !important;
+        }
+        
+        /* Buttons styling */
+        .stButton button, [role="button"], button[kind="secondary"] {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #E2E8F0 !important;
+        }
+        .stButton button:hover, button[kind="secondary"]:hover {
+            border-color: #2563EB !important;
+            color: #2563EB !important;
+        }
+        
+        /* Expanders styling */
+        .st-emotion-cache-1h9z78m, .streamlit-expanderHeader {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 4px;
+        }
+        
+        .system-metrics-footer {
+            border-top: 1px solid #E2E8F0;
+            padding: 1rem 0;
+            margin-top: 3rem;
+            font-size: 0.85rem;
+            color: #64748B;
+            text-align: center;
+        }
+    </style>
+    """
+
+st.markdown(css_style, unsafe_allow_html=True)
 
 # --- Header Section ---
 st.markdown("""
@@ -113,7 +373,54 @@ st.markdown("""
 
 # --- Sidebar UI components ---
 st.sidebar.markdown("# ⚙️ System Controls")
-render_sidebar_api_key()
+
+st.sidebar.markdown("### 🔑 API Key Status")
+
+# Check if environment key exists
+has_env_key = bool(os.getenv("GEMINI_API_KEY"))
+has_custom_key = bool(st.session_state.get("custom_gemini_api_key"))
+
+# Initialize state variables
+if "show_key_input" not in st.session_state:
+    st.session_state.show_key_input = not has_env_key
+
+if has_custom_key:
+    # Custom key is active
+    st.sidebar.success("🛡️ Custom Override Active")
+    if st.sidebar.button("🗑️ Clear Override", use_container_width=True):
+        st.session_state.custom_gemini_api_key = ""
+        st.session_state.show_key_input = not has_env_key
+        st.rerun()
+elif has_env_key:
+    # System environment key is active
+    st.sidebar.info("🔒 Configured via Environment")
+    if not st.session_state.show_key_input:
+        if st.sidebar.button("✏️ Override Key", use_container_width=True):
+            st.session_state.show_key_input = True
+            st.rerun()
+else:
+    # No key configured
+    st.sidebar.warning("⚠️ No API Key Configured")
+
+# Render input field if requested or if no key is present at all
+if st.session_state.show_key_input:
+    custom_key = st.sidebar.text_input(
+        "Enter Custom Gemini API Key",
+        value="",
+        type="password",
+        placeholder="Enter API Key",
+        help="Paste a custom Gemini API key to override the system key. This is processed strictly on the server and is never exposed."
+    )
+    if custom_key:
+        st.session_state.custom_gemini_api_key = custom_key.strip()
+        st.session_state.show_key_input = False
+        st.rerun()
+        
+    if has_env_key:
+        if st.sidebar.button("Cancel Override", use_container_width=True):
+            st.session_state.show_key_input = False
+            st.rerun()
+
 render_sidebar_uploader()
 filters = render_sidebar_collection_stats()
 
@@ -124,8 +431,9 @@ tabs = st.tabs(["💬 Chat Assistant", "📊 Performance Analytics", "📜 Histo
 # --- Tab 1: Chat Assistant ---
 with tabs[0]:
     # Check if API Key is set
-    if not os.getenv("GEMINI_API_KEY"):
-        st.warning("⚠️ Google Gemini API Key is missing. Please enter it in the sidebar to initiate the assistant.")
+    from config.settings import get_gemini_api_key
+    if not get_gemini_api_key():
+        st.warning("⚠️ Google Gemini API Key is missing. Please enter your Gemini API Key in the sidebar or ensure the GEMINI_API_KEY environment variable is configured.")
         
     # Render chat history
     chat_container = st.container()

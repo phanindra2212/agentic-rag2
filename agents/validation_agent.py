@@ -5,8 +5,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from utils.logger import logger
 
+from config.settings import get_gemini_api_key
+
 def _get_validation_llm() -> Any:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = get_gemini_api_key()
     if not api_key:
         return None
     try:

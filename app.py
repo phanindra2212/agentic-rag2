@@ -1,56 +1,17 @@
 import os
 import sys
-import importlib.metadata
 
 # --- Startup Dependency Validation ---
-def check_dependencies():
-    errors = []
-    
-    # 1. Check for active Protobuf descriptor compilation errors
-    try:
-        import google.protobuf.descriptor
-    except TypeError as e:
-        if "Descriptors cannot be created directly" in str(e):
-            errors.append(
-                "Protobuf Version Mismatch: 'Descriptors cannot be created directly' error detected.\n"
-                "This indicates that older generated protobuf files are being loaded in a "
-                "protobuf>=4.0.0 environment.\n"
-                "Please run `pip install -r requirements.txt` to align transitive packages natively."
-            )
-        else:
-            errors.append(f"Protobuf initialization failed: {e}")
-    except ImportError:
-        errors.append("protobuf is not installed in the current environment.")
-
-    # 2. Check for ChromaDB version compatibility
-    try:
-        chroma_ver = importlib.metadata.version("chromadb")
-    except importlib.metadata.PackageNotFoundError:
-        errors.append("chromadb is not installed in the current environment.")
-
-    # 3. Check for Transformers version
-    try:
-        importlib.metadata.version("transformers")
-    except importlib.metadata.PackageNotFoundError:
-        errors.append("transformers is not installed in the current environment.")
-
-    # 4. Check for Sentence-Transformers version
-    try:
-        importlib.metadata.version("sentence-transformers")
-    except importlib.metadata.PackageNotFoundError:
-        errors.append("sentence-transformers is not installed in the current environment.")
-        
-    return errors
-
-validation_errors = check_dependencies()
-if validation_errors:
+try:
+    from validate_environment import validate_env
+    validate_env()
+except Exception as e:
     import streamlit as st
     st.set_page_config(page_title="Dependency Error", page_icon="⚠️", layout="wide")
     st.error("## ⚠️ Startup Dependency Validation Failed")
-    st.write("We detected critical dependency mismatches or import failures in your Python environment:")
-    for err in validation_errors:
-        st.error(err)
-    st.info("To fix this permanently, run: `pip install -r requirements.txt` inside your virtual environment.")
+    st.write("We detected critical environmental or package incompatibilities:")
+    st.error(str(e))
+    st.info("To fix this permanently, please ensure your environment matches the pinned versions in requirements.txt.")
     st.stop()
 
 import streamlit as st

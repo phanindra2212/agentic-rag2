@@ -1,144 +1,134 @@
-# Production-Grade Agentic Multi-Document RAG Knowledge Assistant
+# Production-Grade Agentic Multi-Document RAG SaaS Platform
 
-A professional, resume-ready Retrieval-Augmented Generation (RAG) system built with **LangChain**, **LangGraph**, **Gemini 2.5 Flash**, **ChromaDB**, and **Streamlit**. 
-
-This system supports ingested text from PDF, DOCX, PPTX, and TXT files, leverages LangGraph self-correcting agent loops, performs query expansion, uses LLM-in-the-loop evaluations, and tracks performance analytics.
+This is a production-ready, secure multi-tenant AI knowledge assistant platform. It is engineered with a **Next.js 15+ frontend**, a **FastAPI backend**, **PostgreSQL database schema**, and an agentic self-correcting RAG loop using **LangGraph**, **Gemini 2.5 Flash**, **ChromaDB**, **BAAI/bge-m3 embeddings**, and **BAAI/bge-reranker-v2-m3**.
 
 ---
 
 ## 🏗️ System Architecture
 
-### 1. Ingestion Pipeline
 ```mermaid
 graph TD
-    A[Upload Files] --> B{Extension Detector}
-    B -- .pdf --> C[PyPDFLoader]
-    B -- .docx --> D[Docx2txtLoader]
-    B -- .pptx --> E[python-pptx Loader]
-    B -- .txt --> F[TextLoader]
-    C & D & E & F --> G[clean_text Helper]
-    G --> H[RecursiveCharacterTextSplitter]
-    H --> I[Embeddings Generator]
-    I -- models/text-embedding-004 --> J[Chroma Vector Store]
-    I -- Fallback Sentence-Transformers --> J
+    Client[Next.js 15 Frontend] <-->|JWT Auth / Streams / JSON| API[FastAPI Backend]
+    API <-->|SQL Data / Analytics| DB[(PostgreSQL / SQLite)]
+    
+    subgraph Multi-Tenant RAG Pipeline
+        API -->|Sandboxed Paths| Storage[storage/users/{user_id}/]
+        Storage -->|Raw Uploads| Uploads[uploads/]
+        Storage -->|User Collection| VectorDB[(Chroma Persistent DB)]
+        
+        API -->|User Prompt & Context| Graph[LangGraph Agent Loop]
+        Graph -->|Query Intent| QueryAgent[Query Agent]
+        Graph -->|Vector Search| RetrievalAgent[Retrieval Agent]
+        Graph -->|BGE Cross-Encoder Reranker| ContextAgent[Context Agent]
+        Graph -->|Grounded Gemini Generation| ResponseAgent[Response Agent]
+        Graph -->|Hallucination Filter| ValidationAgent[Validation Agent]
+        
+        ValidationAgent -->|Approved| API
+        ValidationAgent -->|Hallucination Detected - Retry| ResponseAgent
+    end
 ```
 
-### 2. LangGraph Agentic Workflow
-```mermaid
-graph TD
-    UserQuery((User Query)) --> QA[Query Understanding Agent]
-    QA --> |Query Expansion & Complexity Analysis| RA[Retrieval Agent]
-    RA --> |Chroma Querying & Score Merging| CA[Context Optimization Agent]
-    CA --> |De-duplication & Narrative Sorting| RG[Response Generation Agent]
-    RG --> |Gemini 2.5 Flash Response| VA[Validation Agent]
-    VA --> |Check Groundedness & Citations| Cond{Hallucination Detected?}
-    Cond -- Yes & Retries < 2 --> |Feedback & Self-Correction| RG
-    Cond -- No or Retries >= 2 --> FinalAnswer[Final Answer & In-line Evaluator]
+---
+
+## 🔒 Document & Vector Isolation (Multi-Tenancy)
+Security and tenant sandboxing are enforced at the filesystem level.
+Every registered user has an isolated partition:
+```text
+storage/
+   users/
+      {user_id}/
+          uploads/     <-- Raw PDF, DOCX, PPTX, TXT files
+          chroma/      <-- Isolated Chroma vector db folder
 ```
+ChromaDB utilizes dedicated user collections named `user_{user_id}`. Cross-tenant reads/writes/searches are programmatically impossible.
 
 ---
 
 ## ⚡ Key Features
 
-* **Multi-Document Upload**: Handles PDF, DOCX, PPTX, and TXT formats simultaneously (up to 10 files).
-* **Self-Correcting Agent Loop**: Uses **LangGraph** to route responses back to Gemini for self-correction if the validation agent flags hallucinated or ungrounded claims.
-* **Query Expansion**: Generates 3 query variations to retrieve diverse, semantic search matches.
-* **Normalized Confidence Scores**: Converts raw L2 distances into a percentage similarity score (`1 / (1 + distance)`) to rate search confidence.
-* **Groundedness Verification**: Filters claims against the retrieved chunks to eliminate hallucinations.
-* **Interactive Evaluation**: Evaluates every turn on Context Precision, Context Recall, Faithfulness, and Answer Relevance.
-* **Plotly Performance Analytics**: Displays latency analysis (retrieval vs. generation time) and quality trend charts.
-* **Transcripts Export**: Exports full chat transcripts to text or high-quality PDF reports.
-* **Metadata Filters**: Targets search to specific file names or file types.
+* **Multi-Format Uploads**: Supports PDF, DOCX, PPTX, and TXT files simultaneously (validating sizes up to 50MB).
+* **Multi-Stage Agentic Workflow**:
+  - **Query Agent**: Intent detection, complexity classification, and query expansion (3 variations).
+  - **Retrieval Agent**: Fetching candidates from user collection.
+  - **Context Agent**: De-duplication and BGE-Reranker-v2-m3 Cross-Encoder filtering (Top-20 down to Top-5).
+  - **Response Agent**: Grounded response generation with inline citation placeholders.
+  - **Validation Agent**: Groundedness checks to eliminate hallucinations.
+* **ChatGPT-Style Streaming UI**: Implements smooth server-sent event (SSE) streaming client.
+* **Per-User Telemetry & Cost Projection**: Tracks query count, tokens consumed, latency trend (Recharts), storage size, and cost estimates.
+* **Google AdSense Integration**: Responsive, mobile-friendly ad slot components (`<BannerAd />`, `<SidebarAd />`, `<ContentAd />`) with error safety.
 
 ---
 
-## 🛠️ Installation & Setup
+## 🛠️ Local Development & Quickstart
 
 ### Prerequisites
-* Python 3.11 or higher
-* Google Gemini API Key
+* Node.js 20+
+* Python 3.11+
+* Gemini API Key
 
-### 1. Clone & Initialize Environment
-```bash
-# Create virtual environment
-python -m venv .venv
+### Option A: Standard Manual Run
 
-# Activate environment (Windows PowerShell)
-.venv\Scripts\Activate.ps1
-
-# Activate environment (Linux/macOS)
-source .venv/bin/activate
-```
-
-### 2. Install Dependencies & Validate
-All dependencies are strictly pinned in `requirements.txt` to resolve the protobuf version mismatch error (`TypeError: Descriptors cannot be created directly`) by aligning transitive Google API and GRPC packages natively.
-
-```bash
-# Install pinned dependencies
-pip install -r requirements.txt
-
-# Run dependency diagnostics to check for any version conflicts
-python diagnose_dependencies.py
-```
-
-### 3. Setup Environment Variables
+#### 1. Setup Backend
 Create a `.env` file in the root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=sqlite:///./rag_saas.db
+JWT_SECRET=super_secret_jwt_signing_key_here
 ```
 
----
-
-## 🚀 Running the Application
-
-To run the Streamlit application locally, run the following command:
+Initialize environment and run:
 ```bash
-streamlit run app.py
+# Enter project root
+cd agentic-ai-rag
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\Activate.ps1   # Windows
+source .venv/bin/activate    # Linux/Mac
+
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Start backend server
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-This will open the application in your default web browser (typically at `http://localhost:8501`).
+API Documentation will be available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
----
-
-## 🧪 Running Unit Tests
-
-The test suite validates loaders, text helpers, path configurations, and LangGraph agent node states.
-Run the tests with:
+#### 2. Setup Frontend
 ```bash
-python -m unittest discover -s tests
+cd frontend
+npm install
+npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ---
 
-## 📂 Project Structure
+### Option B: Docker Compose (PostgreSQL Production Simulation)
+To run the complete PostgreSQL stack, backend API, and frontend client concurrently:
 
+```bash
+docker-compose up --build
 ```
-├── app.py                      # Streamlit application entry point
-├── requirements.txt            # System dependencies
-├── README.md                   # System documentation
-├── config/
-│   └── settings.py             # Global constants & path configs
-├── loaders/
-│   ├── pdf_loader.py           # PyPDF parser
-│   ├── docx_loader.py          # Word document parser
-│   ├── pptx_loader.py          # PowerPoint parser
-│   └── txt_loader.py           # Text parser
-├── rag/
-│   ├── ingest.py               # Document splitter & Chroma DB management
-│   ├── retriever.py            # Similarity search & metadata filter
-│   ├── embeddings.py           # Google/Sentence-Transformers switcher
-│   ├── memory.py               # Prompt chat history formatter
-│   └── evaluator.py            # Context & faithfulness scorer
-├── agents/
-│   ├── query_agent.py          # Intent parsing & query expansion
-│   ├── retrieval_agent.py      # Multi-query vector db lookup
-│   ├── context_agent.py        # Redundant filtering & sorting
-│   ├── response_agent.py       # Context-grounded response generation
-│   ├── validation_agent.py     # Hallucination detector & routing
-│   └── workflow.py             # LangGraph state & conditional edge compiler
-├── utils/
-│   ├── logger.py               # Console & File logger
-│   ├── metrics.py              # Performance logs (metrics.json)
-│   └── helpers.py              # Text clean & citation compiler
-└── tests/
-    └── test_rag.py             # Loader & Node unittest suite
-```
+This maps:
+* **Frontend Client**: [http://localhost:3000](http://localhost:3000)
+* **Backend API**: [http://localhost:8000](http://localhost:8000)
+* **PostgreSQL DB**: Port `5432`
+
+---
+
+## 🚀 Production Deployment Guidelines
+
+### 1. Database (Neon PostgreSQL)
+* Provision a serverless PostgreSQL instance on **Neon.tech**.
+* Copy the connection string and inject it as `DATABASE_URL` in your backend environment variables (FastAPI will automatically utilize `postgresql+psycopg` dialect).
+
+### 2. Backend (Render / Railway)
+* Build the backend using `backend/Dockerfile`.
+* Mount a persistent disk volume mapping `/backend/storage` to preserve uploaded documents and Chroma DB index files.
+* Inject environment variables: `DATABASE_URL`, `GEMINI_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`.
+
+### 3. Frontend (Vercel)
+* Link the `frontend/` directory to **Vercel**.
+* Configure the build output framework as Next.js.
+* Add Environment Variable `NEXT_PUBLIC_API_URL` pointing to your deployed backend URL (e.g. `https://api.yourdomain.com`).

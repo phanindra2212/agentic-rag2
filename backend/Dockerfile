@@ -21,8 +21,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy backend application source
-COPY . .
+# Copy backend application source into a subdirectory named 'backend'
+COPY . ./backend/
+
 
 # Expose port
 EXPOSE 8000

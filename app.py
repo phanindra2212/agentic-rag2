@@ -3,12 +3,21 @@ import os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 import streamlit as st
+
+# Export Streamlit secrets to process environment variables for external libraries
+try:
+    for key in st.secrets:
+        os.environ[key] = str(st.secrets[key])
+except Exception:
+    pass
+
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables from .env
-load_dotenv()
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from agents.workflow import execute_agentic_rag
 from ui.streamlit_components import (

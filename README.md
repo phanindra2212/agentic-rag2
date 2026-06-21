@@ -70,9 +70,15 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Install Dependencies
+### 2. Install Dependencies & Validate
+All dependencies are strictly pinned in `requirements.txt` to resolve the protobuf version mismatch error (`TypeError: Descriptors cannot be created directly`) by aligning transitive Google API and GRPC packages natively.
+
 ```bash
+# Install pinned dependencies
 pip install -r requirements.txt
+
+# Run dependency diagnostics to check for any version conflicts
+python diagnose_dependencies.py
 ```
 
 ### 3. Setup Environment Variables

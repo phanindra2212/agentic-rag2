@@ -69,108 +69,113 @@ def process_and_index_file(file_path: str) -> Tuple[int, int]:
         Tuple of (number of chunks, total pages)
     """
     logger.info(f"Indexing file: {file_path}")
-    path = Path(file_path)
-    file_name = path.name
-    ext = get_file_extension(str(path))
-    
-    # 1. Load document
-    docs = extract_documents(str(path))
-    total_pages = len(docs)
-    
-    # 2. Clean content
-    for doc in docs:
-        doc.page_content = clean_text(doc.page_content)
-        
-    # 3. Chunk documents
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        length_function=len
-    )
-    chunks = text_splitter.split_documents(docs)
-    
-    # 4. Add unique IDs and rich metadata to each chunk
-    upload_time = datetime.now().isoformat()
-    processed_chunks = []
-    
-    for idx, chunk in enumerate(chunks):
-        chunk_id = f"{file_name}_chunk_{idx}"
-        chunk.metadata.update({
-            "file_name": file_name,
-            "file_type": ext[1:].upper() if ext.startswith(".") else ext.upper(),
-            "chunk_id": chunk_id,
-            "source": str(path),
-            "upload_time": upload_time
-        })
-        processed_chunks.append(chunk)
-        
-    # 5. Connect to Chroma and handle duplicate prevention
-    db = get_vector_store()
-    
-    # Check if files were previously indexed and delete them
     try:
-        # Check if collection exists and delete old vectors for the same file
-        existing = db.get(where={"file_name": file_name})
-        if existing and existing.get("ids"):
-            logger.info(f"Removing {len(existing['ids'])} existing chunks for {file_name} from database.")
-            db.delete(ids=existing["ids"])
-    except Exception as e:
-        logger.warning(f"Could not check/delete existing entries for {file_name}: {e}")
+        path = Path(file_path)
+        file_name = path.name
+        ext = get_file_extension(str(path))
         
-    # 6. Add new chunks to database with batching and exponential backoff retries
-    if processed_chunks:
-        import time
-        chunk_ids = [chunk.metadata["chunk_id"] for chunk in processed_chunks]
+        # 1. Load document
+        docs = extract_documents(str(path))
+        total_pages = len(docs)
         
-        # Batch size of 40 to avoid hitting free-tier 100 requests-per-minute limits
-        batch_size = 40
-        total_batches = (len(processed_chunks) + batch_size - 1) // batch_size
-        
-        for batch_idx in range(total_batches):
-            start_i = batch_idx * batch_size
-            end_i = min(start_i + batch_size, len(processed_chunks))
-            batch_docs = processed_chunks[start_i:end_i]
-            batch_ids = chunk_ids[start_i:end_i]
+        # 2. Clean content
+        for doc in docs:
+            doc.page_content = clean_text(doc.page_content)
             
-            max_retries = 6
-            base_delay = 5.0  # start sleeping at 5s, then 10s, 20s, 40s...
+        # 3. Chunk documents
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP,
+            length_function=len
+        )
+        chunks = text_splitter.split_documents(docs)
+        
+        # 4. Add unique IDs and rich metadata to each chunk
+        upload_time = datetime.now().isoformat()
+        processed_chunks = []
+        
+        for idx, chunk in enumerate(chunks):
+            chunk_id = f"{file_name}_chunk_{idx}"
+            chunk.metadata.update({
+                "file_name": file_name,
+                "file_type": ext[1:].upper() if ext.startswith(".") else ext.upper(),
+                "chunk_id": chunk_id,
+                "source": str(path),
+                "upload_time": upload_time
+            })
+            processed_chunks.append(chunk)
             
-            for attempt in range(max_retries):
-                try:
-                    db.add_documents(batch_docs, ids=batch_ids)
-                    logger.info(f"Successfully indexed batch {batch_idx + 1}/{total_batches} for {file_name}.")
-                    break
-                except Exception as e:
-                    # Catch rate limit 429/RESOURCE_EXHAUSTED exceptions
-                    err_msg = str(e).upper()
-                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "QUOTA" in err_msg:
-                        delay = base_delay * (2 ** attempt)
-                        logger.warning(
-                            f"Rate limit hit during batch {batch_idx + 1} indexing. "
-                            f"Retrying in {delay:.1f}s... (Attempt {attempt + 1}/{max_retries})"
-                        )
-                        time.sleep(delay)
-                    else:
-                        logger.error(f"Failed to add document batch {batch_idx + 1}: {e}", exc_info=True)
-                        raise e
+        # 5. Connect to Chroma and handle duplicate prevention
+        db = get_vector_store()
+        
+        # Check if files were previously indexed and delete them
+        try:
+            # Check if collection exists and delete old vectors for the same file
+            existing = db.get(where={"file_name": file_name})
+            if existing and existing.get("ids"):
+                logger.info(f"Removing {len(existing['ids'])} existing chunks for {file_name} from database.")
+                db.delete(ids=existing["ids"])
+        except Exception as e:
+            logger.warning(f"Could not check/delete existing entries for {file_name}: {e}", exc_info=True)
+            
+        # 6. Add new chunks to database with batching and exponential backoff retries
+        if processed_chunks:
+            import time
+            chunk_ids = [chunk.metadata["chunk_id"] for chunk in processed_chunks]
+            
+            # Batch size of 40 to avoid hitting free-tier 100 requests-per-minute limits
+            batch_size = 40
+            total_batches = (len(processed_chunks) + batch_size - 1) // batch_size
+            
+            for batch_idx in range(total_batches):
+                start_i = batch_idx * batch_size
+                end_i = min(start_i + batch_size, len(processed_chunks))
+                batch_docs = processed_chunks[start_i:end_i]
+                batch_ids = chunk_ids[start_i:end_i]
+                
+                max_retries = 6
+                base_delay = 5.0  # start sleeping at 5s, then 10s, 20s, 40s...
+                
+                for attempt in range(max_retries):
+                    try:
+                        db.add_documents(batch_docs, ids=batch_ids)
+                        logger.info(f"Successfully indexed batch {batch_idx + 1}/{total_batches} for {file_name}.")
+                        break
+                    except Exception as e:
+                        # Catch rate limit 429/RESOURCE_EXHAUSTED exceptions
+                        err_msg = str(e).upper()
+                        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "QUOTA" in err_msg:
+                            delay = base_delay * (2 ** attempt)
+                            logger.warning(
+                                f"Rate limit hit during batch {batch_idx + 1} indexing. "
+                                f"Retrying in {delay:.1f}s... (Attempt {attempt + 1}/{max_retries})"
+                            )
+                            time.sleep(delay)
+                        else:
+                            logger.error(f"Failed to add document batch {batch_idx + 1}: {e}", exc_info=True)
+                            raise e
+                else:
+                    logger.critical(f"Failed to index batch {batch_idx + 1} after {max_retries} retries due to rate limits.")
+                    raise RuntimeError("Document ingestion aborted: rate limits exceeded repeatedly.")
+            
+        # 7. Update analytics/metrics
+        # Count unique documents in DB
+        try:
+            db_data = db.get()
+            if db_data and db_data.get("metadatas"):
+                unique_files = len(set(meta["file_name"] for meta in db_data["metadatas"]))
+                total_db_chunks = len(db_data["ids"])
+                update_document_stats(unique_files, total_db_chunks)
             else:
-                logger.critical(f"Failed to index batch {batch_idx + 1} after {max_retries} retries due to rate limits.")
-                raise RuntimeError("Document ingestion aborted: rate limits exceeded repeatedly.")
-        
-    # 7. Update analytics/metrics
-    # Count unique documents in DB
-    try:
-        db_data = db.get()
-        if db_data and db_data.get("metadatas"):
-            unique_files = len(set(meta["file_name"] for meta in db_data["metadatas"]))
-            total_db_chunks = len(db_data["ids"])
-            update_document_stats(unique_files, total_db_chunks)
-        else:
-            update_document_stats(0, 0)
+                update_document_stats(0, 0)
+        except Exception as e:
+            logger.error(f"Error calculating collection stats: {e}", exc_info=True)
+            
+        return len(processed_chunks), total_pages
+
     except Exception as e:
-        logger.error(f"Error calculating collection stats: {e}")
-        
-    return len(processed_chunks), total_pages
+        logger.error(f"Critical error during document indexing for {file_path}: {e}", exc_info=True)
+        raise e
 
 def get_collection_statistics() -> Dict[str, Any]:
     """Returns analytics metadata about the Chroma database collection."""

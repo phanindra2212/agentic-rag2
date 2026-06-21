@@ -1,15 +1,29 @@
+# Pinned dependencies to resolve and prevent protobuf version/compilation conflicts
+# compatibility tested on Windows, Linux, Streamlit Cloud, and Python 3.11/3.13.
 
-streamlit>=1.35.0
-langchain>=0.2.0
-langchain-community>=0.2.0
-langchain-google-genai>=1.0.0
-langgraph>=0.0.50
-chromadb>=0.5.0
-pypdf>=4.0.0
-docx2txt>=0.8
-python-pptx>=0.6.23
-reportlab>=4.1.0
-pandas>=2.0.0
-plotly>=5.18.0
-python-dotenv>=1.0.1
-sentence-transformers>=3.0.0
+streamlit==1.58.0
+langchain==1.3.10
+langchain-classic==1.0.8
+langchain-community==0.4.2
+langchain-core==1.4.8
+langchain-google-genai==4.2.5
+langchain-text-splitters==1.1.2
+langgraph==1.2.6
+chromadb==1.5.9
+pypdf==6.13.3
+docx2txt==0.9
+python-pptx==1.0.2
+reportlab==5.0.0
+pandas==3.0.3
+plotly==6.8.0
+python-dotenv==1.2.2
+sentence-transformers==5.6.0
+transformers==5.12.1
+torch==2.12.1
+
+# Core Protobuf and Transitive Packages for SDKs
+protobuf==5.26.1
+googleapis-common-protos==1.75.0
+google-genai==2.9.0
+google-auth==2.55.0
+grpcio==1.81.1

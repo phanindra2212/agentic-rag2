@@ -17,9 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency spec and install packages
-COPY requirements.txt .
+COPY requirements_docker.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements_docker.txt
+
 
 # Copy backend application source into a subdirectory named 'backend'
 COPY . ./backend/

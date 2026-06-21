@@ -1,15 +1,17 @@
-import torch
 from backend.app.config.settings import RERANKER_MODEL_NAME
 from backend.app.utils.logger import logger
 from typing import List, Optional
 from langchain_core.documents import Document
 
 try:
+    import torch
     from sentence_transformers import CrossEncoder
     HAS_SENTENCE_TRANSFORMERS = True
 except ImportError:
     HAS_SENTENCE_TRANSFORMERS = False
     CrossEncoder = None
+    torch = None
+
 
 _reranker_instance = None
 
